@@ -11,6 +11,7 @@ Crop Information Scraper
 
 2. Clonar este repo. Si no sabés clonar un repositorio, [acá te dejo un link](https://www.taloselectronics.com/blogs/tutoriales/como-descargar-un-proyecto-de-github)
 
+3. Otra opción en lugar de clonar, se puede descargar el código desde el botón `<> Code`  -> `Download ZIP`
 
 ### Setup :hammer:
 
