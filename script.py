@@ -15,6 +15,9 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 
+from selenium.webdriver.common.action_chains import ActionChains
+
+
 import logging
 
 from config import *
@@ -115,22 +118,46 @@ def save_table_pandas(driver, country, crop, page):
 
 
     
-def create_pandas_frame(driver, total_pages):
+def create_pandas_frame(driver, total_pages, page_number):
     logging.debug("save_table_pandas(driver)")
     table = driver.find_element(By.XPATH, '//*[@id="crud_list"]/table')
     
     # Read and Convert Web table into data frame
+    print('Total pages: {}'.format(total_pages))
+
+    
     if str(total_pages) == str(1):
+        print('DATAFRAME: sin param header')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'))[0]
+    elif str(total_pages) == str(page_number):
+        print('DATAFRAME: sin param header - Last Page')
+        webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=0)[0]     
+
+        print(webtable_df.columns.tolist())
+        print(webtable_df.iloc[0])
+        print(webtable_df.iloc[1])
+        print(webtable_df.iloc[2])
+        print("")
+        webtable_df = webtable_df.iloc[1:]
+        print(webtable_df.columns.tolist())
+        print(webtable_df.iloc[0])
+        print(webtable_df.iloc[1])
+        print(webtable_df.iloc[2])   
     else: 
+        print('DATAFRAME: param header = 1')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=1)[0]
     
     # duplicate values and fill empty rows
     webtable_clean = webtable_df.replace(np.nan,'EMPTY1234').replace('"', np.nan).ffill().replace('EMPTY1234', np.nan)
    
     # Change date format
+    
+    print(webtable_clean.columns.tolist())
+
     webtable_clean['Last update'] = pd.to_datetime(webtable_clean['Last update'])
     webtable_clean['Last update'] =  webtable_clean['Last update'].dt.strftime('%Y-%m-%d')
+    #webtable_clean.iloc[:, 20] = pd.to_datetime(webtable_clean.iloc[:, 20],  format='%Y-%m-%d', errors='coerce')
+    #webtable_clean.iloc[:, 20] =  webtable_clean.iloc[:, 20].dt.strftime('%Y-%m-%d')
        
     return webtable_clean
 
@@ -171,17 +198,28 @@ def pagination_total_pages(driver):
         return(-1)
 
 def pagination_click_page(page_number):
-    logging.debug("pagination_click_page(page_number)") 
+    logging.debug("pagination_click_page(page_number): {}".format(page_number)) 
+    #input("esperando..")
     try:
         if driver.find_elements(By.XPATH, '//*[@id="crud_list"]/nav/ul/li'):
             pagination = driver.find_elements(By.XPATH, '//*[@id="crud_list"]/nav/ul/li')
+            #for pa in pagination:
+            #    print('for 1: {}'.format(pa.text))
+
             scroll_down(driver)
+
+            #input("avanzar...")
+            sleep_custom(1)
+            pagination = driver.find_elements(By.XPATH, '//*[@id="crud_list"]/nav/ul/li')
             for p in pagination:
+ 
+                print('for 2: {}'.format(p.text))
                 # element = WebDriverWait(driver, 30).until(
                 #    EC.presence_of_element_located((By.XPATH, '//*[@id="crud_list"]/table'))
                 # )
                 
                 if p.text == str(page_number):
+
                     print("Page: {}".format(p.text))
                     WebDriverWait(driver, 20).until(EC.element_to_be_clickable(p)).click()
                     #p.click()
@@ -212,6 +250,7 @@ def pagination_click_page(page_number):
     
 
 def scroll_down(driver):
+    print("scroll_down(driver)")
     lenOfPage = driver.execute_script("window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;")
     match=False
     while(match==False):
@@ -220,6 +259,7 @@ def scroll_down(driver):
             lenOfPage = driver.execute_script("window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;")
             if lastCount==lenOfPage:
                 match=True
+    print("end scroll_down(driver)")
 
 
 def create_search_terms():
@@ -327,13 +367,30 @@ def save_frame_to_csv(pd_frame, country, crop, page):
 
 def search_an_save_pagination(driver, country, crop):
     global path
-    print("search_an_save(driver, {}, {})".format(country, crop))    
     print("")
+    print("search_an_save_pagination(driver, {}, {})".format(country, crop))    
+
     
     country_crop_start_time = datetime.datetime.now()
     run_search(driver, country, crop)
-    sleep_custom(10)
+    sleep_custom(13)
     #save_table_while(driver, country)
+
+
+    SHORT_TIMEOUT  = 5   # give enough time for the loading element to appear
+    LONG_TIMEOUT = 90  # give enough time for loading to finish
+    try:
+        # then wait for the element to disappear
+        WebDriverWait(driver, LONG_TIMEOUT).until(EC.invisibility_of_element_located((By.ID, "popup_wait")))
+        logging.debug("-> Popup not visible") 
+    except TimeoutException:
+        print("Timeout Exception")
+        # if timeout exception was raised - it may be safe to 
+        # assume loading has finished, however this may not 
+        # always be the case, use with caution, otherwise handle
+        # appropriately.
+        pass 
+
     total_pages = pagination_total_pages(driver)
     element = WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="crud_list"]/table'))
@@ -343,18 +400,22 @@ def search_an_save_pagination(driver, country, crop):
         return -1
     elif int(total_pages) == 1:
         #save_table_pandas(driver, country, crop, 1)
-        pd_frame = create_pandas_frame(driver, total_pages)
+        page_number = 1
+        pd_frame = create_pandas_frame(driver, total_pages, page_number)
         pages_frames.append(pd_frame)
         #save_frame_to_csv(pd_frame, country, crop, 'ALL')
         #return 1
     elif int(total_pages) > 1:
         for page_number in range (1, int(total_pages)+1):
+            print('Page number to click: {}'.format(page_number))
             pagination_click_page(page_number)
+            print('Clicked')
+            sleep_custom(10)
             element = WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located((By.XPATH, '//*[@id="crud_list"]/table'))
             )
             #save_table_pandas(driver, country, crop, page_number)
-            pd_frame = create_pandas_frame(driver, total_pages)     
+            pd_frame = create_pandas_frame(driver, total_pages, page_number)     
             #save_frame_to_csv(pd_frame, country, crop, page_number)
             
             pages_frames.append(pd_frame)
@@ -546,7 +607,7 @@ logging.info('Path is set to: %s', path)
 
 driver = webdriver.Chrome()
 
-menu(driver)
-#complete_run(driver)
+#menu(driver)
+complete_run(driver)
 
 
