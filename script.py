@@ -74,6 +74,11 @@ def run_search(driver, country, crop):
     
     # Expand
     link_crop = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/h3[1]/a')
+
+    scroll_down(driver)
+    #input("avanzar...")
+    sleep_custom(1)
+
     link_crop.click()
     sleep_custom(2)
     
