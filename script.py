@@ -365,6 +365,10 @@ def save_frame_to_csv(pd_frame, country, crop, page):
     # pd_frame['Last update'] = pd.to_datetime(pd_frame['Last update'])
     # pd_frame['Last update'] =  pd_frame['Last update'].dt.strftime('%Y-%m-%d')
     # save_frame_to_csv(pd_frame, 'CANADA', 'DATE', 'DATE')
+    filename_excel = "".join([country,'_', crop_clean,'_', str(page), '.xlsx'])
+    path_xls = path + "\\" + filename_excel
+    pd_frame.to_excel (path_xls)
+
 
 
 
