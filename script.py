@@ -59,7 +59,7 @@ def login(driver):
     sleep_custom(2)
     submit_button.click()
 
-def run_search(driver, country, crop):
+def run_search(driver, country, crop, exclude_others):
     logging.info("run_search()")
     
     driver.get(url_search)
@@ -94,10 +94,34 @@ def run_search(driver, country, crop):
     logging.info("Crop: {}".format(crop))    
     sleep_custom(2)
     
+    # Exclude others
+    if exclude_others:
+        exclude_other = driver.find_element(By.XPATH, '//*[@id="mrls_details_report_euCropCodeExcludeOtherProducts"]')
+        exclude_other.click()
+        sleep_custom(1)
+
     # Submit
     button_display = driver.find_element(By.XPATH, "//button[@type='submit']")
     button_display.submit()
     sleep_custom(2)
+
+    sleep_custom(13)
+    #save_table_while(driver, country)
+
+
+    SHORT_TIMEOUT  = 5   # give enough time for the loading element to appear
+    LONG_TIMEOUT = 90  # give enough time for loading to finish
+    try:
+        # then wait for the element to disappear
+        WebDriverWait(driver, LONG_TIMEOUT).until(EC.invisibility_of_element_located((By.ID, "popup_wait")))
+        logging.debug("-> Popup not visible") 
+    except TimeoutException:
+        print("Timeout Exception")
+        # if timeout exception was raised - it may be safe to 
+        # assume loading has finished, however this may not 
+        # always be the case, use with caution, otherwise handle
+        # appropriately.
+        pass 
 
 
 
@@ -298,81 +322,47 @@ def open_search_terms():
     logging.info('Combinaciones de búsquedas encontradas: %s', len(data))
     cant_ready = 0
     cant_pending = 0
+    cant_error = 0
     for term in data: 
         if term['status'] == 'Ready':
             cant_ready += 1
         elif term['status'] == 'Pendiente':
             cant_pending +=1
-    logging.info('Listas {},  Pendientes: {}'.format(cant_ready, cant_pending))        
+        elif term['status'] == 'Error':
+            cant_error +=1
+    logging.info('Listas {}, Error {},  Pendientes: {}'.format(cant_ready, cant_error, cant_pending))        
     return data
 
-""" def open_crops_countries(driver):
-    # Using readlines()
-    file_paises = open('paises.txt', 'r')
-    paises = file_paises.readlines()
-    
-    file_cultivos = open('cultivos.txt', 'r')
-    cultivos = file_cultivos.readlines()
-    
-    # Strips the newline character
-    for pais in paises:
-        # Strips the newline character
-        for cultivo in cultivos:
-            print("{}, {}".format(pais.strip(), cultivo.strip())) 
-            search_an_save(driver, pais.strip(), cultivo.strip())  
-    count = 0
-    # Strips the newline character
-    for pais in paises:
-        count += 1
-        #print("Line{}: {}".format(count, pais.strip()))
-        count2 = 0
-        # Strips the newline character
-        for cultivo in cultivos:
-            count2 += 1
-            print("{}, {}".format(pais.strip(), cultivo.strip())) 
-            search_an_save(driver, pais.strip(), cultivo.strip())   """
-
-"""    
-def search_an_save(driver, country, crop):
-    global path
-    print("")
-    print("search_and_save(driver, {}, {})".format(country, crop))    
-    run_search(driver, country, crop)
-    sleep_custom(10)    
-    #save_table_while(driver, country)
-    
-    total_pages = pagination_total_pages(driver)
-    
-    element = WebDriverWait(driver, 30).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id="crud_list"]/table'))
-    )
-    save_table_pandas(driver, country, crop, 0)
-    print(country) 
-    country_end_time = datetime.datetime.now()
-    print (country_end_time) 
-    
-    return 1 """
 
 def save_frame_to_csv(pd_frame, country, crop, page): 
     # Set filename
-    crop_clean = crop.replace(':', '')
-    filename = "".join([country,'_', crop_clean,'_', str(page), '.csv'])
     global path
+    crop_clean = crop.replace(':', '').replace('/', '-')
+    filename = "".join([country,'_', crop_clean,'_', str(page), '.csv'])
     path_csv = path + "\\" + filename
     
     # Write() to CSV file
     pd_frame.to_csv(path_csv)
-    # pd_frame['Last update'] = pd.to_datetime(pd_frame['Last update'])
-    # pd_frame['Last update'] =  pd_frame['Last update'].dt.strftime('%Y-%m-%d')
-    # save_frame_to_csv(pd_frame, 'CANADA', 'DATE', 'DATE')
+
+def alert_danger_present(driver):
+    if driver.find_elements(By.CSS_SELECTOR, 'div.alert-danger'):
+#       check_if_alert_danger(driver)==1:
+        logging.info("Mensaje de error detectado")
+        mensaje = driver.find_element(By.CSS_SELECTOR, 'div.alert-danger').text
+        logging.info("Error en pantalla: {}".format(mensaje))
+        return True
+    else:
+        return False
+
+def save_frame_to_xlsx(pd_frame, country, crop, page): 
+    # Set filename
+    global path
+    crop_clean = crop.replace(':', '').replace('/', '-')
     filename_excel = "".join([country,'_', crop_clean,'_', str(page), '.xlsx'])
     path_xls = path + "\\" + filename_excel
+
+    # Write() to XLSX file
     pd_frame.to_excel (path_xls)
-
-
-
-
-
 
 def search_an_save_pagination(driver, country, crop):
     global path
@@ -381,24 +371,15 @@ def search_an_save_pagination(driver, country, crop):
 
     
     country_crop_start_time = datetime.datetime.now()
-    run_search(driver, country, crop)
-    sleep_custom(13)
-    #save_table_while(driver, country)
+    run_search(driver, country, crop, exclude_others=False)
 
-
-    SHORT_TIMEOUT  = 5   # give enough time for the loading element to appear
-    LONG_TIMEOUT = 90  # give enough time for loading to finish
-    try:
-        # then wait for the element to disappear
-        WebDriverWait(driver, LONG_TIMEOUT).until(EC.invisibility_of_element_located((By.ID, "popup_wait")))
-        logging.debug("-> Popup not visible") 
-    except TimeoutException:
-        print("Timeout Exception")
-        # if timeout exception was raised - it may be safe to 
-        # assume loading has finished, however this may not 
-        # always be the case, use with caution, otherwise handle
-        # appropriately.
-        pass 
+    if alert_danger_present(driver):
+        # Retry but this time "excluding others"
+        logging.info("Intentando una vez mas con Exclude Others")
+        run_search(driver, country, crop, exclude_others=True)
+        if alert_danger_present(driver):
+            return 0
+    
 
     total_pages = pagination_total_pages(driver)
     element = WebDriverWait(driver, 30).until(
@@ -434,8 +415,14 @@ def search_an_save_pagination(driver, country, crop):
     logging.info("{} / {}.  {} pages. Total time: {}".format(country, crop, total_pages, country_crop_total_time))
     
     country_frame = pd.concat(pages_frames)
-    save_frame_to_csv(country_frame, country, crop, 'ALL')
-    
+    #save_frame_to_csv(country_frame, country, crop, 'ALL')
+    try:
+        save_frame_to_xlsx(country_frame, country, crop, 'ALL')
+    except Exception as e:
+        logging.info('Error al guardar! {}'.format(crop))
+        print(e)
+        return 0
+
     return 1
 
 
@@ -518,6 +505,7 @@ def check_input_files():
 terms = []
 
 def menu(driver):
+    global terms    
     try:
         print("")
         print("************MAIN MENU**************")
@@ -539,7 +527,7 @@ def menu(driver):
 
                         Please enter your choice: """)
         if choice == "A" or choice =="a":
-            global terms
+            #global terms
             terms = create_load_search_terms()
         if choice == "A1" or choice =="a1":
             for term in terms: print(term)
@@ -554,9 +542,12 @@ def menu(driver):
         elif choice == "S" or choice =="s":
             complete_run(driver)
         elif choice == "T" or choice =="t":
+
+            terms = create_load_search_terms()            
             login(driver)
             sleep_custom(10)
             accept_all_cookies(driver)
+            driver.get(url_search)            
         elif choice=="X" or choice=="x":
             return
         elif choice=="Q" or choice=="q":
@@ -575,19 +566,22 @@ def read_terms_search_save(driver, terms):
         
         pais = term['country']
         cultivo = term['crop']
-        if term['status'] == 'Ready':
-            print('{},{}: Skipped'.format(pais, cultivo)) 
+        if term['status'] == 'Ready' or term['status'] == 'Error':
+            print('{},{},{}: Skipped'.format(pais, cultivo, term['status'])) 
             continue
         if pais != 'pais': 
             res = search_an_save_pagination(driver, pais, cultivo)
+            
+            # If res=1 mark as ready, otherwise mark as error.
             if res == 1: 
                 term['status']='Ready'
                 #print(term)
-                save_csv_terms_from_dict(terms)
             else:
                 print("Error in search_an_save")
                 term['status']='Error'
                 print(term)
+                
+            save_csv_terms_from_dict(terms)
             random_sleep()
 
 
@@ -616,6 +610,7 @@ logging.info('Path is set to: %s', path)
 
 driver = webdriver.Chrome()
 
+# Choose Menu o Complete Run
 #menu(driver)
 complete_run(driver)
 
