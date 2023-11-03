@@ -164,14 +164,14 @@ def create_pandas_frame(driver, total_pages, page_number):
 
         print(webtable_df.columns.tolist())
         print(webtable_df.iloc[0])
-        print(webtable_df.iloc[1])
-        print(webtable_df.iloc[2])
+        #print(webtable_df.iloc[1])
+        #print(webtable_df.iloc[2])
         print("")
         webtable_df = webtable_df.iloc[1:]
         print(webtable_df.columns.tolist())
         print(webtable_df.iloc[0])
-        print(webtable_df.iloc[1])
-        print(webtable_df.iloc[2])   
+        #print(webtable_df.iloc[1])
+        #print(webtable_df.iloc[2])   
     else: 
         print('DATAFRAME: param header = 1')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=1)[0]
@@ -219,8 +219,13 @@ def pagination_total_pages(driver):
     
         #print(results_info.get_attribute('outerHTML'))
         print(results_info.text)
-        cant_pages = results_info.text.split('/')[1]
+        if 'Results 0-0 - Page 1/1' in results_info.text:
+            #cant_pages = 0
+            cant_pages = -1
+        else:    
+            cant_pages = results_info.text.split('/')[1]
         logging.info("Pages: {}".format(cant_pages))
+        
         return(cant_pages)
     else:
         logging.error("not found: find_elements(By.XPATH, '//*[@id='crud_list']/div[2]'): ")
@@ -371,16 +376,21 @@ def search_an_save_pagination(driver, country, crop):
 
     
     country_crop_start_time = datetime.datetime.now()
-    run_search(driver, country, crop, exclude_others=False)
+    
+    run_search(driver, country, crop, exclude_others=True)
 
+    '''
+    run_search(driver, country, crop, exclude_others=False)
     if alert_danger_present(driver):
         # Retry but this time "excluding others"
         logging.info("Intentando una vez mas con Exclude Others")
         run_search(driver, country, crop, exclude_others=True)
         if alert_danger_present(driver):
             return 0
+    '''
+    if alert_danger_present(driver):
+        return 0
     
-
     total_pages = pagination_total_pages(driver)
     element = WebDriverWait(driver, 30).until(
         EC.presence_of_element_located((By.XPATH, '//*[@id="crud_list"]/table'))
@@ -571,11 +581,13 @@ def read_terms_search_save(driver, terms):
             continue
         if pais != 'pais': 
             res = search_an_save_pagination(driver, pais, cultivo)
-            
+
             # If res=1 mark as ready, otherwise mark as error.
             if res == 1: 
                 term['status']='Ready'
                 #print(term)
+            elif res == -1:                 
+                term['status']='No results'                
             else:
                 print("Error in search_an_save")
                 term['status']='Error'
