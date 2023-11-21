@@ -82,10 +82,11 @@ def run_search(driver, country, crop, exclude_others):
     link_crop.click()
     sleep_custom(2)
     
-    # Crop
-    input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[1]/div[2]/div/span/span[1]/span/ul/li/input')
+    # Search by Crop
+    '''input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[1]/div[2]/div/span/span[1]/span/ul/li/input')
+
     input_crop_search.send_keys(crop)
-    #input_crop_search.send_keys(Keys.RETURN)
+    
     results = driver.find_elements(By.CSS_SELECTOR, 'li.select2-results__option')
     for r in results:
         if r.text == crop:
@@ -93,7 +94,17 @@ def run_search(driver, country, crop, exclude_others):
             break
     logging.info("Crop: {}".format(crop))    
     sleep_custom(2)
-    
+    '''
+
+    # Search by EU Crop Code
+    input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[2]/div[3]/div/span[2]')
+    input_crop_search.click()
+    sleep_custom(1)
+    input_crop_txt = driver.find_element(By.XPATH, '/html/body/span/span/span[1]/input')
+    input_crop_txt.send_keys(crop)
+    input_crop_txt.send_keys(Keys.RETURN)
+
+    #exclude_others = False
     # Exclude others
     if exclude_others:
         exclude_other = driver.find_element(By.XPATH, '//*[@id="mrls_details_report_euCropCodeExcludeOtherProducts"]')
@@ -108,6 +119,20 @@ def run_search(driver, country, crop, exclude_others):
     sleep_custom(13)
     #save_table_while(driver, country)
 
+    if driver.find_elements(By.CSS_SELECTOR, 'div.invalid-feedback'):
+            div_error = driver.find_element(By.CSS_SELECTOR, 'div.invalid-feedback')
+            logging.info("Mensaje de Error encontrado: {}".format(div_error.text))
+            logging.info("Intentando nuevamente sin Exclude Others")
+            exclude_other = driver.find_element(By.XPATH, '//*[@id="mrls_details_report_euCropCodeExcludeOtherProducts"]')
+            exclude_other.click()
+            sleep_custom(1)
+
+            # Submit
+            button_display = driver.find_element(By.XPATH, "//button[@type='submit']")
+            button_display.submit()
+            sleep_custom(2)
+
+            sleep_custom(13)
 
     SHORT_TIMEOUT  = 5   # give enough time for the loading element to appear
     LONG_TIMEOUT = 90  # give enough time for loading to finish
@@ -158,24 +183,43 @@ def create_pandas_frame(driver, total_pages, page_number):
     if str(total_pages) == str(1):
         print('DATAFRAME: sin param header')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'))[0]
+        #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS_H', page_number)
     elif str(total_pages) == str(page_number):
         print('DATAFRAME: sin param header - Last Page')
-        webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=0)[0]     
+        webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=0)[0]
+        #webtable_df = pd.read_html(table.get_attribute('outerHTML'))[0]
+        #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS_I', page_number)     
 
-        print(webtable_df.columns.tolist())
-        print(webtable_df.iloc[0])
+        #print(webtable_df.columns.tolist())
+        #print(webtable_df.iloc[0])
         #print(webtable_df.iloc[1])
         #print(webtable_df.iloc[2])
         print("")
-        webtable_df = webtable_df.iloc[1:]
-        print(webtable_df.columns.tolist())
-        print(webtable_df.iloc[0])
+
+        if isinstance(webtable_df.index, pd.MultiIndex) and webtable_df.index.nlevels > 1:
+            webtable_df.columns = webtable_df.columns.droplevel(1)
+        webtable_df = webtable_df.loc[:, ~webtable_df.columns.duplicated()]
+        webtable_df = webtable_df.reset_index(drop=True)
+        #webtable_df = webtable_df.iloc[1:]
+        #print(webtable_df.columns.tolist())
+        #print(webtable_df.iloc[0])
         #print(webtable_df.iloc[1])
         #print(webtable_df.iloc[2])   
+        #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS_Trans_I', page_number)
+
+        if webtable_df.loc[0, 'Last update'] == 'Last update':
+            # Eliminar la fila
+            webtable_df = webtable_df.drop(0)
+            print("Doble encabezado eliminado")
+            #print(webtable_df.columns.tolist())
+            #print(webtable_df.iloc[0])
+
+        
     else: 
         print('DATAFRAME: param header = 1')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=1)[0]
-    
+        #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS', page_number)
+
     # duplicate values and fill empty rows
     webtable_clean = webtable_df.replace(np.nan,'EMPTY1234').replace('"', np.nan).ffill().replace('EMPTY1234', np.nan)
    
@@ -342,7 +386,7 @@ def open_search_terms():
 def save_frame_to_csv(pd_frame, country, crop, page): 
     # Set filename
     global path
-    crop_clean = crop.replace(':', '').replace('/', '-')
+    crop_clean = crop.replace(':', '').replace('/', '-').replace(' ', '-')
     filename = "".join([country,'_', crop_clean,'_', str(page), '.csv'])
     path_csv = path + "\\" + filename
     
@@ -362,7 +406,7 @@ def alert_danger_present(driver):
 def save_frame_to_xlsx(pd_frame, country, crop, page): 
     # Set filename
     global path
-    crop_clean = crop.replace(':', '').replace('/', '-')
+    crop_clean = crop.replace(':', '').replace('/', '-').replace(' ', '-')
     filename_excel = "".join([country,'_', crop_clean,'_', str(page), '.xlsx'])
     path_xls = path + "\\" + filename_excel
 
@@ -426,8 +470,17 @@ def search_an_save_pagination(driver, country, crop):
     
     country_frame = pd.concat(pages_frames)
     #save_frame_to_csv(country_frame, country, crop, 'ALL')
+
+    # Obtener nombre de cultivo desde primer fila de dataframe
+    crop_name_complete = country_frame.at[0, 'Crop']
+    print(crop_name_complete)
+    crop_name = str(crop_name_complete).split('(')[0]
+
     try:
-        save_frame_to_xlsx(country_frame, country, crop, 'ALL')
+        if crop_name:
+            save_frame_to_xlsx(country_frame, country, crop_name, 'ALL')
+        else:
+            save_frame_to_xlsx(country_frame, country, crop, 'ALL')
     except Exception as e:
         logging.info('Error al guardar! {}'.format(crop))
         print(e)
