@@ -599,7 +599,45 @@ def salir():
     exit()
 
 def check_input_files():
-    existen = True
+    correct_combination = False
+    exists_countries = os.path.isfile(filename_countries)
+    exists_crops_codes = os.path.isfile(filename_crops_codes)
+    exists_crops_names = os.path.isfile(filename_crops_names)
+    exists_actives = os.path.isfile(filename_actives)
+
+    # If there is a valid combination of files
+    if  ((exists_countries and exists_crops_codes and not exists_crops_names and not exists_actives) or         # Original: Countries + Crop codes
+        (exists_actives and not exists_countries and not exists_crops_names and not exists_crops_codes) or      # Only Actives
+        (exists_actives and     exists_countries and not exists_crops_names and not exists_crops_codes) or      # Actives and Countries
+        (exists_actives and not exists_countries and     exists_crops_names and not exists_crops_codes ) or     # Actives and Crop_names
+        (exists_actives and     exists_countries and not exists_crops_codes and     exists_crops_names)):        # Actives and Countries and Crop_names
+
+        logging.info('Combinación válida de archivos:')
+        correct_combination = True
+
+    # If there isn't a valid combination of files
+    else:
+        logging.info('Combinación inválida de archivos.')
+        print('''
+        Combinación inválida de archivos.
+        Las combinaciones válidas son:
+        - Original: Paises y Codigos de Cultivo
+        - Solo Activos
+        - Solo Activos y Paises
+        - Solo Actives y Nombres de Cultivos
+        - Solo Actives y Nombres de Cultivos y Paises
+        ''')
+        correct_combination = False
+    
+    logging.info(f'{filename_countries}: {exists_countries}')
+    logging.info(f'{filename_crops_codes}: {exists_crops_codes}')
+    logging.info(f'{filename_crops_names}: {exists_crops_names}')
+    logging.info(f'{filename_actives}: {exists_actives}')
+
+    return correct_combination
+
+
+    '''
     if os.path.isfile('paises.txt') == False:
         logging.info('paises.txt no existe,  saliendo...')
         existen = False
@@ -607,6 +645,7 @@ def check_input_files():
         logging.info('cultivos.txt no existe,  saliendo...')
         existen = False
     return existen
+    '''
     
 terms = []
 
