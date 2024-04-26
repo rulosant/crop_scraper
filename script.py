@@ -59,56 +59,93 @@ def login(driver):
     sleep_custom(2)
     submit_button.click()
 
-def run_search(driver, country, crop, exclude_others):
+def run_search(driver, term, exclude_others):
     logging.info("run_search()")
-    
+
+    print(terms)
+
     driver.get(url_search)
     sleep_custom(5)
     
     # Country
-    input_mrl_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[1]/div[2]/div/span[2]/span[1]/span/ul/li/input')
-    input_mrl_search.send_keys(country)
-    input_mrl_search.send_keys(Keys.RETURN)
-    logging.info("Country: {}".format(country))
-    sleep_custom(2)
+    if 'country' in term.keys():
+        country = term['country']
+        
+        # Type country name in country input
+        input_mrl_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[1]/div[2]/div/span[2]/span[1]/span/ul/li/input')
+        input_mrl_search.send_keys(country)
+        input_mrl_search.send_keys(Keys.RETURN)
+        logging.info("Country: {}".format(country))
+        sleep_custom(2)
+        
+
+        # Expand 'Crop filter' Section
+        link_crop = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/h3[1]/a')
+        scroll_down(driver)
+        #input("avanzar...")
+        sleep_custom(1)
+
+        link_crop.click()
+        sleep_custom(2)
     
-    # Expand
-    link_crop = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/h3[1]/a')
+    # Expand 'Crop' section
+    if 'crop_name' in term.keys() or 'crop' in term.keys() :    
+        input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[2]/div[3]/div/span[2]')
+        input_crop_search.click()
+        sleep_custom(1)
 
-    scroll_down(driver)
-    #input("avanzar...")
-    sleep_custom(1)
 
-    link_crop.click()
-    sleep_custom(2)
+    # Search by EU Crop Code OR 'Crop name'
+    # Search by Crop_name
+    if 'crop_name' in term.keys():
+        crop_name = term['crop_name']
+        
+        input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[1]/div[2]/div/span/span[1]/span/ul/li/input')
+        input_crop_search.send_keys(crop_name)
     
-    # Search by Crop
-    '''input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[1]/div[2]/div/span/span[1]/span/ul/li/input')
-
-    input_crop_search.send_keys(crop)
+        results = driver.find_elements(By.CSS_SELECTOR, 'li.select2-results__option')
+        for r in results:
+            if r.text == crop_name:
+                r.click()
+                break
+        logging.info("Crop: {}".format(crop_name))    
+        sleep_custom(2)    
     
-    results = driver.find_elements(By.CSS_SELECTOR, 'li.select2-results__option')
-    for r in results:
-        if r.text == crop:
-            r.click()
-            break
-    logging.info("Crop: {}".format(crop))    
-    sleep_custom(2)
-    '''
+    # Search by EU Crop Code    
+    elif 'crop' in term.keys():
+        crop = term['crop']
 
-    # Search by EU Crop Code
-    input_crop_search = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[2]/div[2]/div[3]/div/span[2]')
-    input_crop_search.click()
-    sleep_custom(1)
-    input_crop_txt = driver.find_element(By.XPATH, '/html/body/span/span/span[1]/input')
-    input_crop_txt.send_keys(crop)
-    input_crop_txt.send_keys(Keys.RETURN)
+        # Type crop code in 'EU Crop Code' input
+        input_crop_txt = driver.find_element(By.XPATH, '/html/body/span/span/span[1]/input')
+        input_crop_txt.send_keys(crop)
+        input_crop_txt.send_keys(Keys.RETURN)
 
-    #exclude_others = False
-    # Exclude others
-    if exclude_others:
-        exclude_other = driver.find_element(By.XPATH, '//*[@id="mrls_details_report_euCropCodeExcludeOtherProducts"]')
-        exclude_other.click()
+        #exclude_others = False
+        # Exclude others
+        if exclude_others:
+            exclude_other = driver.find_element(By.XPATH, '//*[@id="mrls_details_report_euCropCodeExcludeOtherProducts"]')
+            exclude_other.click()
+            sleep_custom(1)
+
+
+
+
+    if 'active' in term.keys():
+        active = term['active']
+
+        # Expand 'Active filter' section
+        link_active = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[3]/h3[1]/a')
+        scroll_down(driver)
+        sleep_custom(1)
+        link_active.click()
+        sleep_custom(2)
+
+        # Select Active from dropdow input
+        input_active_search = driver.find_element(By.XPATH, '//*[@id="mrls_details_report_actiName"]')
+        input_active_search.click()
+        input_active_search.send_keys(active)
+        input_active_search.send_keys(Keys.DOWN) 
+        input_active_search.send_keys(Keys.ENTER)
         sleep_custom(1)
 
     # Submit
@@ -413,15 +450,18 @@ def save_frame_to_xlsx(pd_frame, country, crop, page):
     # Write() to XLSX file
     pd_frame.to_excel (path_xls)
 
-def search_an_save_pagination(driver, country, crop):
+def search_an_save_pagination(driver, term):
     global path
-    print("")
-    print("search_an_save_pagination(driver, {}, {})".format(country, crop))    
+    print(f'Term: {term}')
+    country = term['country']
+    crop = term['crop']
 
-    
+    print("")
+    print("search_an_save_pagination(driver, {}, {})".format(country, crop))   
+
     country_crop_start_time = datetime.datetime.now()
     
-    run_search(driver, country, crop, exclude_others=True)
+    run_search(driver, term, exclude_others=True)
 
     '''
     run_search(driver, country, crop, exclude_others=False)
@@ -498,21 +538,24 @@ def save_csv_terms_from_dict(terms):
         for term in terms:
             wr.writerow([term['country'], term['crop'], term['status']]) 
 
+# 
 def create_load_search_terms():
     # check whether directory already exists
     if not os.path.exists(path):
         os.mkdir(path)
         
         logging.info("Folder %s created!" % path)
-        
+
+    # If file does not exists, then create the file and the terms    
     if os.path.isfile('export\searches.csv') == False:
         logging.info('Creando export\searches.csv desde paises.txt y cultivos.txt')
         terms = create_search_terms()
         save_csv_terms_from_dict(terms)
+
+    # If file exists, load the terms
     else: 
         logging.info('export\searches.csv existe, retomando estado')
         terms = open_search_terms()
-        #for term in terms: print(term)
     return terms
 
 
@@ -626,14 +669,19 @@ def menu(driver):
 
 def read_terms_search_save(driver, terms):
     for term in terms:
+
+        # Example terms to add to term dict for testing purposes
+        # term['active'] = 'PATULIN'
+        # term['crop_name'] = "VALERIAN"
         
         pais = term['country']
         cultivo = term['crop']
         if term['status'] == 'Ready' or term['status'] == 'Error':
-            print('{},{},{}: Skipped'.format(pais, cultivo, term['status'])) 
+            #print('{},{},{}: Skipped'.format(pais, cultivo, term['status'])) 
+            print(f'{term}: Skipped')
             continue
         if pais != 'pais': 
-            res = search_an_save_pagination(driver, pais, cultivo)
+            res = search_an_save_pagination(driver, term)
 
             # If res=1 mark as ready, otherwise mark as error.
             if res == 1: 
@@ -676,7 +724,7 @@ logging.info('Path is set to: %s', path)
 driver = webdriver.Chrome()
 
 # Choose Menu o Complete Run
-#menu(driver)
+# menu(driver)
 complete_run(driver)
 
 
