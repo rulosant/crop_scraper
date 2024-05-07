@@ -32,7 +32,12 @@ logging.basicConfig(
 ) # + info: https://realpython.com/python-logging/#using-handlers
 
  
-
+class InvalidColumnsException(Exception):
+    # Raised when there is an incorrect combination of columns in the CSV file
+    def __init__(self, column_names, message="Incorrect columns in CSV"):
+        self.column_names = column_names
+        self.message = message
+        super().__init__(self.message)
 
 def sleep_custom(sleep_time):
     if sleep_time >= 10: 
@@ -130,8 +135,8 @@ def run_search(driver, term, exclude_others):
 
 
 
-    if 'active' in term.keys():
-        active = term['active']
+    if 'active_principle' in term.keys():
+        active = term['active_principle']
 
         # Expand 'Active filter' section
         link_active = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[3]/h3[1]/a')
@@ -378,32 +383,125 @@ def scroll_down(driver):
 
 
 def create_search_terms():
+    logging.debug("create_search_terms()")     
+
+    exists_countries = os.path.isfile(filename_countries)
+    exists_crops_codes = os.path.isfile(filename_crops_codes)
+    exists_crops_names = os.path.isfile(filename_crops_names)
+    exists_actives = os.path.isfile(filename_actives)
+
+    print(exists_countries) 
+    print(exists_crops_codes)
+    print(exists_crops_names)
+    print(exists_actives)
+
     # Using readlines()
-    file_paises = open('paises.txt', 'r')
-    paises = file_paises.readlines()
-    
-    file_cultivos = open('cultivos.txt', 'r')
-    cultivos = file_cultivos.readlines()
-    
+    if exists_countries:
+        file_paises = open(filename_countries, 'r')
+        paises = file_paises.readlines()
+
+    if exists_crops_codes:
+        file_crops_codes = open(filename_crops_codes, 'r')
+        crop_codes = file_crops_codes.readlines()
+
+    if exists_crops_names:
+        file_crops_names = open(filename_crops_names, 'r')
+        crops_names = file_crops_names.readlines()
+
+    if exists_actives:
+        file_actives = open(filename_actives, 'r')
+        actives = file_actives.readlines()
+
     dict_terms = []
-    
-    for pais in paises:
-        # Strips the newline character
-        for cultivo in cultivos:
-            term = {"country": pais.strip(), "crop": cultivo.strip(), "status": 'Pendiente'}
-            #print(term) 
-            dict_terms.append(term)
-    
+
+    if (exists_countries and exists_crops_codes and not exists_crops_names and not exists_actives):         # Original: Countries + Crop codes
+        print("Original: Countries + Crop codes")
+        for pais in paises:
+            for crop_code in crop_codes:
+                term = {"country": pais.strip(), "crop": crop_code.strip(), "status": 'Pendiente'}
+                dict_terms.append(term)
+    elif (exists_actives and not exists_countries and not exists_crops_names and not exists_crops_codes):      # Only Actives
+        for active in actives:
+            term = {"active_principle": active.strip(), "status": 'Pendiente'}
+            dict_terms.append(term)    
+    elif (exists_actives and     exists_countries and not exists_crops_names and not exists_crops_codes):      # Actives and Countries
+        for pais in paises:
+            for active in actives:
+                term = {"country": pais.strip(), "active_principle": active.strip(), "status": 'Pendiente'}
+                dict_terms.append(term) 
+    elif (exists_actives and not exists_countries and     exists_crops_names and not exists_crops_codes):     # Actives and Crop_names
+        for crop_name in crops_names:
+            for active in actives:
+                term = {"crop_name": crop_name.strip(), "active_principle": active.strip(), "status": 'Pendiente'}
+                dict_terms.append(term)         
+    elif (exists_actives and     exists_countries and not exists_crops_codes and     exists_crops_names):        # Actives and Countries and Crop_names
+        print("# Actives and Countries and Crop_names")
+        for pais in paises:
+            for crop_name in crops_names:
+                for active in actives:
+                    term = {"country": pais.strip(), "crop_name": crop_name.strip(), "active_principle": active.strip(), "status": 'Pendiente'}
+                    dict_terms.append(term)   
+    else:
+        logging.info('Ninguna combinación creada:')
     logging.info('Combinaciones de búsquedas creadas: %s', len(dict_terms))
     #logging.DEBUG(dict_terms)
     
     return dict_terms
 
+def check_correct_columns(column_titles):
+    logging.debug("check_correct_columns(data) #Check correct columns in csv file")
+
+    correct_combination = False
+    exists_countries = 'country' in column_titles
+    exists_crops_codes = 'crop' in column_titles
+    exists_crops_names = 'crop_name' in column_titles
+    exists_actives = 'active_principle' in column_titles
+
+    print(exists_countries) 
+    print(exists_crops_codes)
+    print(exists_crops_names)
+    print(exists_actives)
+
+
+
+    # If there is a valid combination of files
+    if  ((exists_countries and exists_crops_codes and not exists_crops_names and not exists_actives) or         # Original: Countries + Crop codes
+        (exists_actives and not exists_countries and not exists_crops_names and not exists_crops_codes) or      # Only Actives
+        (exists_actives and     exists_countries and not exists_crops_names and not exists_crops_codes) or      # Actives and Countries
+        (exists_actives and not exists_countries and     exists_crops_names and not exists_crops_codes ) or     # Actives and Crop_names
+        (exists_actives and     exists_countries and not exists_crops_codes and     exists_crops_names)):        # Actives and Countries and Crop_names
+
+        logging.info('Combinación válida de columnas en archivo.')
+        correct_combination = True
+
+    # If there isn't a valid combination of files
+    else:
+        logging.info('Combinación inválida de columnas en archivo.')
+        print('''
+        Combinación inválida de columnas.
+        Las combinaciones válidas son:
+        - Original: Paises y Codigos de Cultivo
+        - Solo Activos
+        - Solo Activos y Paises
+        - Solo Actives y Nombres de Cultivos
+        - Solo Actives y Nombres de Cultivos y Paises
+        ''')
+        correct_combination = False
+    return correct_combination
+
 
 def open_search_terms():
     file = open("export\searches.csv", "r")
     data = list(csv.DictReader(file, delimiter=","))
-    file.close()
+
+
+    # Obtain column titles
+    column_titles = data[0].keys() if data else []
+    print(column_titles)
+    file.close()  
+    if not check_correct_columns(column_titles):
+        raise InvalidColumnsException(column_titles)
+
     #print(data)
     logging.info('Combinaciones de búsquedas encontradas: %s', len(data))
     cant_ready = 0
@@ -454,10 +552,10 @@ def search_an_save_pagination(driver, term):
     global path
     print(f'Term: {term}')
     country = term['country']
-    crop = term['crop']
+    #crop = term['crop']
 
     print("")
-    print("search_an_save_pagination(driver, {}, {})".format(country, crop))   
+    print("search_an_save_pagination(driver, {})".format(term))   
 
     country_crop_start_time = datetime.datetime.now()
     
@@ -506,7 +604,7 @@ def search_an_save_pagination(driver, term):
             
     country_crop_end_time = datetime.datetime.now()
     country_crop_total_time = country_crop_end_time - country_crop_start_time
-    logging.info("{} / {}.  {} pages. Total time: {}".format(country, crop, total_pages, country_crop_total_time))
+    logging.info("{}.  {} pages. Total time: {}".format(terms, total_pages, country_crop_total_time))
     
     country_frame = pd.concat(pages_frames)
     #save_frame_to_csv(country_frame, country, crop, 'ALL')
@@ -519,17 +617,28 @@ def search_an_save_pagination(driver, term):
     try:
         if crop_name:
             save_frame_to_xlsx(country_frame, country, crop_name, 'ALL')
-        else:
-            save_frame_to_xlsx(country_frame, country, crop, 'ALL')
+        #else:
+        #    save_frame_to_xlsx(country_frame, country, crop, 'ALL')
     except Exception as e:
-        logging.info('Error al guardar! {}'.format(crop))
+        logging.info('Error al guardar! {}'.format(terms))
         print(e)
         return 0
 
     return 1
 
-
 def save_csv_terms_from_dict(terms):
+    filename = "".join(['export\searches.csv'])
+    with open(filename, 'w', newline='', encoding="utf-8") as csvfile:
+        wr = csv.writer(csvfile, quoting=csv.QUOTE_ALL, quotechar='"')
+        # Strips the newline character
+
+        wr.writerow(terms[0].keys())
+        for term in terms:
+            wr.writerow(term.values()) 
+
+
+
+def save_csv_terms_from_dict_old(terms):
     filename = "".join(['export\searches.csv'])
     with open(filename, 'w', newline='', encoding="utf-8") as csvfile:
         wr = csv.writer(csvfile, quoting=csv.QUOTE_ALL, quotechar='"')
@@ -651,60 +760,61 @@ terms = []
 
 def menu(driver):
     global terms    
-    try:
-        print("")
-        print("************MAIN MENU**************")
-        #time.sleep(1)
-        print()
-        choice = input("""
-                        A: Crear Terminos
-                        A1: Imprimir Terminos                        
-                        B: Login
-                        C: Aceptar cookies
-                        D: Check Liability page
+    #try:
+    print("")
+    print("************MAIN MENU**************")
+    #time.sleep(1)
+    print()
+    choice = input("""
+                    A: Crear Terminos
+                    A1: Imprimir Terminos                        
+                    B: Login
+                    C: Aceptar cookies
+                    D: Check Liability page
 
-                        E: Leer terminos y buscarlos PAGINADO
+                    E: Leer terminos y buscarlos PAGINADO
 
-                        T: Secuencia Test
-                        S: Secuencia completa
-                        X: Salir del menu
-                        Q: Quit
+                    T: Secuencia Test
+                    S: Secuencia completa
+                    X: Salir del menu
+                    Q: Quit
 
-                        Please enter your choice: """)
-        if choice == "A" or choice =="a":
-            #global terms
-            terms = create_load_search_terms()
-        if choice == "A1" or choice =="a1":
-            for term in terms: print(term)
-        elif choice == "B" or choice =="b":
-            login(driver)
-        elif choice == "C" or choice =="c":
-            accept_all_cookies(driver)
-        elif choice == "D" or choice =="d":        
-           check_liability_page(driver)
-        elif choice == "E" or choice =="e":
-            read_terms_search_save(driver, terms) 
-        elif choice == "S" or choice =="s":
-            complete_run(driver)
-        elif choice == "T" or choice =="t":
+                    Please enter your choice: """)
+    if choice == "A" or choice =="a":
+        #global terms
+        terms = create_load_search_terms()
+    if choice == "A1" or choice =="a1":
+        for term in terms: print(term)
+    elif choice == "B" or choice =="b":
+        login(driver)
+    elif choice == "C" or choice =="c":
+        accept_all_cookies(driver)
+    elif choice == "D" or choice =="d":        
+        check_liability_page(driver)
+    elif choice == "E" or choice =="e":
+        read_terms_search_save(driver, terms) 
+    elif choice == "S" or choice =="s":
+        complete_run(driver)
+    elif choice == "T" or choice =="t":
 
-            terms = create_load_search_terms()            
-            login(driver)
-            sleep_custom(10)
-            accept_all_cookies(driver)
-            driver.get(url_search)            
-        elif choice=="X" or choice=="x":
-            return
-        elif choice=="Q" or choice=="q":
-            salir()
-        else:
-            print("Debe seleccionar una opcion valida.")
-            print("Pruebe de nuevo")
-        menu(driver)
-    except Exception as e:
+        terms = create_load_search_terms()            
+        login(driver)
+        sleep_custom(10)
+        accept_all_cookies(driver)
+        driver.get(url_search)            
+    elif choice=="X" or choice=="x":
+        return
+    elif choice=="Q" or choice=="q":
+        salir()
+    else:
+        print("Debe seleccionar una opcion valida.")
+        print("Pruebe de nuevo")
+    menu(driver)
+
+    '''   except Exception as e:
         print("EXCEPCION!")
         print("EXCEPCION!")
-        print(e)
+        print(e)'''
 
 def read_terms_search_save(driver, terms):
     for term in terms:
@@ -714,7 +824,7 @@ def read_terms_search_save(driver, terms):
         # term['crop_name'] = "VALERIAN"
         
         pais = term['country']
-        cultivo = term['crop']
+        #cultivo = term['crop']
         if term['status'] == 'Ready' or term['status'] == 'Error':
             #print('{},{},{}: Skipped'.format(pais, cultivo, term['status'])) 
             print(f'{term}: Skipped')
@@ -762,8 +872,13 @@ logging.info('Path is set to: %s', path)
 
 driver = webdriver.Chrome()
 
+try:
 # Choose Menu o Complete Run
-# menu(driver)
-complete_run(driver)
-
+    #menu(driver)
+    complete_run(driver)
+except InvalidColumnsException as e:
+    logging.info(f"Columnas inválidas en el CSV: {list(e.column_names)}")
+except Exception as e:
+    print("EXCEPCION!")
+    print(e)
 
