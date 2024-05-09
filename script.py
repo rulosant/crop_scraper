@@ -119,7 +119,7 @@ def run_search(driver, term, exclude_others):
     # Search by EU Crop Code    
     elif 'crop' in term.keys():
         crop = term['crop']
-
+        logging.info("Crop code: {}".format(crop))  
         # Type crop code in 'EU Crop Code' input
         input_crop_txt = driver.find_element(By.XPATH, '/html/body/span/span/span[1]/input')
         input_crop_txt.send_keys(crop)
@@ -137,7 +137,7 @@ def run_search(driver, term, exclude_others):
 
     if 'active_principle' in term.keys():
         active = term['active_principle']
-
+        logging.info("Active principle: {}".format(active))  
         # Expand 'Active filter' section
         link_active = driver.find_element(By.XPATH, '//*[@id="crud_search"]/form/div[3]/h3[1]/a')
         scroll_down(driver)
@@ -223,11 +223,11 @@ def create_pandas_frame(driver, total_pages, page_number):
 
     
     if str(total_pages) == str(1):
-        print('DATAFRAME: sin param header')
+        logging.debug('DATAFRAME: sin param header')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'))[0]
         #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS_H', page_number)
     elif str(total_pages) == str(page_number):
-        print('DATAFRAME: sin param header - Last Page')
+        logging.info('DATAFRAME: sin param header - Last Page')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=0)[0]
         #webtable_df = pd.read_html(table.get_attribute('outerHTML'))[0]
         #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS_I', page_number)     
@@ -252,13 +252,13 @@ def create_pandas_frame(driver, total_pages, page_number):
         if webtable_df.loc[0, 'Last update'] == 'Last update':
             # Eliminar la fila
             webtable_df = webtable_df.drop(0)
-            print("Doble encabezado eliminado")
+            logging.info("Doble encabezado eliminado")
             #print(webtable_df.columns.tolist())
             #print(webtable_df.iloc[0])
 
         
     else: 
-        print('DATAFRAME: param header = 1')
+        logging.info('DATAFRAME: param header = 1')
         webtable_df = pd.read_html(table.get_attribute('outerHTML'), header=1)[0]
         #save_frame_to_xlsx(webtable_df, 'USA_TEST', 'APRICOTS', page_number)
 
@@ -267,7 +267,7 @@ def create_pandas_frame(driver, total_pages, page_number):
    
     # Change date format
     
-    print(webtable_clean.columns.tolist())
+    logging.debug(webtable_clean.columns.tolist())
 
     webtable_clean['Last update'] = pd.to_datetime(webtable_clean['Last update'])
     webtable_clean['Last update'] =  webtable_clean['Last update'].dt.strftime('%Y-%m-%d')
@@ -333,7 +333,7 @@ def pagination_click_page(page_number):
             pagination = driver.find_elements(By.XPATH, '//*[@id="crud_list"]/nav/ul/li')
             for p in pagination:
  
-                print('for 2: {}'.format(p.text))
+                logging.debug('for 2: {}'.format(p.text))
                 # element = WebDriverWait(driver, 30).until(
                 #    EC.presence_of_element_located((By.XPATH, '//*[@id="crud_list"]/table'))
                 # )
@@ -357,7 +357,7 @@ def pagination_click_page(page_number):
                         WebDriverWait(driver, LONG_TIMEOUT).until(EC.invisibility_of_element_located((By.ID, "popup_wait")))
                         logging.debug("-> Popup not visible") 
                     except TimeoutException:
-                        print("Timeout Exception")
+                        logging.info("Timeout Exception")
                         # if timeout exception was raised - it may be safe to 
                         # assume loading has finished, however this may not 
                         # always be the case, use with caution, otherwise handle
@@ -365,12 +365,12 @@ def pagination_click_page(page_number):
                         pass 
                     break
     except Exception as e:
-        print("Exception in pagination!")
-        print(e)                
+        logging.info("Exception in pagination!")
+        logging.info(e)                
     
 
 def scroll_down(driver):
-    print("scroll_down(driver)")
+    logging.debug("scroll_down(driver)")     
     lenOfPage = driver.execute_script("window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;")
     match=False
     while(match==False):
@@ -379,7 +379,7 @@ def scroll_down(driver):
             lenOfPage = driver.execute_script("window.scrollTo(0, document.body.scrollHeight);var lenOfPage=document.body.scrollHeight;return lenOfPage;")
             if lastCount==lenOfPage:
                 match=True
-    print("end scroll_down(driver)")
+    logging.debug("end scroll_down(driver)")     
 
 
 def create_search_terms():
@@ -448,8 +448,9 @@ def create_search_terms():
     
     return dict_terms
 
+# Check correct columns in csv file
 def check_correct_columns(column_titles):
-    logging.debug("check_correct_columns(data) #Check correct columns in csv file")
+    logging.info("check_correct_columns(column_titles) ")
 
     correct_combination = False
     exists_countries = 'country' in column_titles
@@ -457,10 +458,10 @@ def check_correct_columns(column_titles):
     exists_crops_names = 'crop_name' in column_titles
     exists_actives = 'active_principle' in column_titles
 
-    print(exists_countries) 
-    print(exists_crops_codes)
-    print(exists_crops_names)
-    print(exists_actives)
+    logging.info(f'country: {exists_countries}') 
+    logging.info(f'crop: {exists_crops_codes}')
+    logging.info(f'crop_name: {exists_crops_names}')
+    logging.info(f'active_principle: {exists_actives}')
 
 
 
@@ -549,8 +550,7 @@ def save_frame_to_xlsx(pd_frame, country, crop, page):
     pd_frame.to_excel (path_xls)
 
 def search_an_save_pagination(driver, term):
-    global path
-    print(f'Term: {term}')
+    global path    
     country = term['country']
     #crop = term['crop']
 
@@ -636,6 +636,14 @@ def save_csv_terms_from_dict(terms):
         for term in terms:
             wr.writerow(term.values()) 
 
+        # Obtain column titles
+'''           
+    file = open("export\searches.csv", "r")
+    data = list(csv.DictReader(file, delimiter=","))
+    column_titles = data[0].keys() if data else []
+    print(column_titles)
+    file.close()  
+'''
 
 
 def save_csv_terms_from_dict_old(terms):
@@ -666,6 +674,7 @@ def create_load_search_terms():
         logging.info('export\searches.csv existe, retomando estado')
         terms = open_search_terms()
     return terms
+    
 
 
 
@@ -773,6 +782,8 @@ def menu(driver):
                     D: Check Liability page
 
                     E: Leer terminos y buscarlos PAGINADO
+                   
+                    M: Merge XLS
 
                     T: Secuencia Test
                     S: Secuencia completa
@@ -802,6 +813,8 @@ def menu(driver):
         sleep_custom(10)
         accept_all_cookies(driver)
         driver.get(url_search)            
+    elif choice=="M" or choice=="m":
+        merge_xlsx_files(path)
     elif choice=="X" or choice=="x":
         return
     elif choice=="Q" or choice=="q":
@@ -816,7 +829,27 @@ def menu(driver):
         print("EXCEPCION!")
         print(e)'''
 
+def check_merge_output(column_titles):
+    logging.info("check_merge_output")
+    correct_combination = False
+    exists_countries = 'country' in column_titles
+    exists_crops_codes = 'crop' in column_titles
+    exists_crops_names = 'crop_name' in column_titles
+    exists_actives = 'active_principle' in column_titles
+
+    # If there is a valid combination of files
+    if  (exists_countries and exists_crops_codes and not exists_crops_names and not exists_actives): # Original: Countries + Crop codes
+        logging.info("Output in individual files")
+        return False
+    else:
+        logging.info("Merge output")
+        return True
+
 def read_terms_search_save(driver, terms):
+    logging.info("read_terms_search_save")
+    column_titles = terms[0].keys() if terms else []
+    print(column_titles)
+
     for term in terms:
 
         # Example terms to add to term dict for testing purposes
@@ -846,6 +879,29 @@ def read_terms_search_save(driver, terms):
             save_csv_terms_from_dict(terms)
             random_sleep()
 
+    # Check if oputput XLSX will be merged
+    if check_merge_output(column_titles):
+        merge_xlsx_files()
+    
+    
+        
+def merge_xlsx_files():
+    global path
+    # Create an empty list to store individual DataFrames    
+    frames = []    
+    for root, dirs, files in os.walk(path):        
+        for file in files:
+            #print(file)
+            if file.endswith('.xlsx'):
+                logging.info(file)
+                file_with_path = os.path.join(root, file)   
+                #print(file_with_path)       
+                df = pd.read_excel(file_with_path)      
+                frames.append(df)    
+    df = pd.concat(frames, axis=0)
+    path_xls = path + "\\" + "merged_excel.xlsx"        
+    df.to_excel(path_xls)
+    
 
 def complete_run(driver):
     if check_input_files() == False:
@@ -869,7 +925,7 @@ cwd = os.getcwd()
 path = cwd + "\export"
 logging.info('Path is set to: %s', path)
 
-
+column_titles = []
 driver = webdriver.Chrome()
 
 try:
