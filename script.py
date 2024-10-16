@@ -300,22 +300,56 @@ def pagination_total_pages(driver):
         # always be the case, use with caution, otherwise handle
         # appropriately.
         pass     
-    if driver.find_elements(By.XPATH, '//*[@id="crud_list"]/div[2]'):
-        results_info = driver.find_element(By.XPATH, '//*[@id="crud_list"]/div[2]')
-    
-        #print(results_info.get_attribute('outerHTML'))
-        print(results_info.text)
-        if 'Results 0-0 - Page 1/1' in results_info.text:
+
+    results_found = False
+    if not results_found:
+        if driver.find_elements(By.XPATH, '//*[@id="crud_list"]/div[3]'):
+            results_info = driver.find_element(By.XPATH, '//*[@id="crud_list"]/div[3]')
+            results_info_text = results_info.text
+            if "Results" in results_info_text:
+                results_found = True            
+            print(f"Div[3]: {results_found}: {results_info_text} ")
+
+    if not results_found:
+        if driver.find_elements(By.XPATH, '//*[@id="crud_list"]/div[2]'):
+            results_info = driver.find_element(By.XPATH, '//*[@id="crud_list"]/div[2]')
+            results_info_text = results_info.text
+            if "Results" in results_info.text:
+                results_found = True            
+            print(f"Div[2]: {results_found}: {results_info_text}")
+
+    if not results_found:
+        if driver.find_elements(By.XPATH, '//*[@id="crud_list"]/div[1]'):
+            results_info_div = driver.find_element(By.XPATH, '//*[@id="crud_list"]/div[1]')
+            #print(results_info_test.text)
+            if "Display" in results_info_div.text:
+                results_info_text = results_info_div.text.split(' Display ')[0]
+                if "Results" in results_info_text:
+                    results_found = True
+                print(f"Div[1]: {results_found}: {results_info_text}")
+
+
+
+
+    if results_found:
+        logging.info("Pagination results found")
+        if 'Results 0-0 - Page 1/1' in results_info_text:
             #cant_pages = 0
             cant_pages = -1
-        else:    
-            cant_pages = results_info.text.split('/')[1]
-        logging.info("Pages: {}".format(cant_pages))
-        
-        return(cant_pages)
+        else:
+            if "/" in results_info_text:
+                cant_pages = results_info_text.split('/')[1]
+            else:
+                logging.error("Pagination info error: -/- not found ")
+                return(-1)
+        logging.info(f"Pages: {cant_pages}")
     else:
-        logging.error("not found: find_elements(By.XPATH, '//*[@id='crud_list']/div[2]'): ")
-        return(-1)
+        logging.error("Pagination not found. -Results text- not found ")
+        return(-1)        
+    
+    return(cant_pages)
+
+
 
 def pagination_click_page(page_number):
     logging.debug("pagination_click_page(page_number): {}".format(page_number)) 
@@ -722,13 +756,16 @@ def check_input_files():
     exists_crops_codes = os.path.isfile(filename_crops_codes)
     exists_crops_names = os.path.isfile(filename_crops_names)
     exists_actives = os.path.isfile(filename_actives)
+    exists_searches = os.path.isfile("export\searches.csv")
 
     # If there is a valid combination of files
     if  ((exists_countries and exists_crops_codes and not exists_crops_names and not exists_actives) or         # Original: Countries + Crop codes
         (exists_actives and not exists_countries and not exists_crops_names and not exists_crops_codes) or      # Only Actives
         (exists_actives and     exists_countries and not exists_crops_names and not exists_crops_codes) or      # Actives and Countries
         (exists_actives and not exists_countries and     exists_crops_names and not exists_crops_codes ) or     # Actives and Crop_names
-        (exists_actives and     exists_countries and not exists_crops_codes and     exists_crops_names)):        # Actives and Countries and Crop_names
+        (exists_actives and     exists_countries and not exists_crops_codes and     exists_crops_names) or     # Actives and Countries and Crop_names
+        (exists_searches)):                                                                                      # Combinations file
+
 
         logging.info('Combinación válida de archivos:')
         correct_combination = True
@@ -744,6 +781,8 @@ def check_input_files():
         - Solo Activos y Paises
         - Solo Actives y Nombres de Cultivos
         - Solo Actives y Nombres de Cultivos y Paises
+              
+        Si no se proveen archivos de combinaciones, debe proveerse el archivo de búsquedas searches.csv
         ''')
         correct_combination = False
     
